@@ -1,0 +1,15 @@
+# Local build products; the two preview PDFs in the root are kept for readers.
+/output/
+/tmp/
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.xdv
+*.synctex.gz
+.DS_Store
+Thumbs.db

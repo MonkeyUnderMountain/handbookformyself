@@ -1,0 +1,302 @@
+% handbookformyself -- Copyright (c) 2026 handbookformyself contributors
+% SPDX-License-Identifier: MIT
+% 可复用样式放在这里；封面、报告内容和正文顺序放在 main.tex。
+\NeedsTeXFormat{LaTeX2e}[2022-06-01]
+\ProvidesPackage{handbookformyself}[2026/11/10 v0.1 Personal conference handbook]
+% 宏包依赖先加载，下面再按功能配置变量和命令。
+\RequirePackage{iftex}
+\ifXeTeX\else
+  \PackageError{handbookformyself}{Use XeLaTeX}{Compile with latexmk -xelatex main.tex.}
+\fi
+\RequirePackage{xparse,etoolbox}
+\RequirePackage[scheme=plain,fontset=none]{ctex}
+\RequirePackage{fontspec,mathtools}
+\RequirePackage[warnings-off={mathtools-colon,mathtools-overbracket}]{unicode-math}
+\RequirePackage{xcolor,graphicx,tikz,fontawesome6,geometry,needspace,fancyhdr,lastpage,enumitem}
+\RequirePackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\RequirePackage[unicode,hidelinks,bookmarksopen=true]{hyperref}
+
+
+
+
+
+
+
+
+
+
+% 1. 字体变量：正文、标题、页眉均使用衬线字体。
+\setmainfont{LibertinusSerif-Regular.otf}[
+  BoldFont=LibertinusSerif-Bold.otf,ItalicFont=LibertinusSerif-Italic.otf,
+  BoldItalicFont=LibertinusSerif-BoldItalic.otf]
+% 中文粗斜体采用直立粗宋；英文仍可用正常斜体。
+\setCJKmainfont{FandolSong-Regular.otf}[
+  BoldFont=FandolSong-Bold.otf,ItalicFont=FandolKai-Regular.otf,
+  BoldItalicFont=FandolSong-Bold.otf]
+\setCJKmonofont{FandolFang-Regular.otf}
+\setmathfont{LibertinusMath-Regular.otf}
+\IfFontExistsTF{STIXTwoMath-Regular.otf}{%
+  \setmathfont{STIXTwoMath-Regular.otf}[range={cal,bfcal}]
+  \setmathfont{STIXTwoMath-Regular.otf}[range={scr,bfscr},StylisticSet=1]}{}
+
+
+
+
+
+
+
+
+
+
+% 2. 默认功能色。main.tex 可在加载模板后用 definecolor/colorlet 覆盖。
+\definecolor{HBMain}{HTML}{397D7F}   % 栏目和场次
+\definecolor{HBTime}{HTML}{3A629C}   % 日期和时间
+\definecolor{HBTalk}{HTML}{7E55A0}   % 报告和摘要
+\definecolor{HBBreak}{HTML}{42875A}  % 休息和讨论
+\definecolor{HBNotice}{HTML}{C36423} % 待确认和提醒
+\definecolor{HBMuted}{HTML}{6D747A}  % 单位等次要信息
+
+
+
+
+
+
+
+
+
+
+% 3. 图标：使用 Font Awesome 6 Free；下列别名保留统一的功能配色。
+\newcommand{\hb@icon@clock}{\textcolor{HBTime}{\faIcon[regular]{clock}}}
+\newcommand{\hb@icon@day}{\textcolor{HBTime}{\faIcon[regular]{calendar-days}}}
+\newcommand{\hb@icon@location}{\textcolor{HBMain}{\faIcon{location-dot}}}
+\newcommand{\hb@icon@session}{\textcolor{HBMain}{\faIcon{users}}}
+\newcommand{\hb@icon@speaker}{\textcolor{HBMain}{\faIcon[regular]{user}}}
+\newcommand{\hb@icon@talk}{\textcolor{HBTalk}{\faIcon{microphone}}}
+\newcommand{\hb@icon@break}{\textcolor{HBBreak}{\faIcon[regular]{circle-pause}}}
+\newcommand{\hb@icon@interval}{\hb@icon@break}
+\newcommand{\hb@icon@coffee}{\textcolor{HBBreak}{\faIcon{mug-saucer}}}
+\newcommand{\hb@icon@discussion}{\textcolor{HBBreak}{\faIcon[regular]{comments}}}
+\newcommand{\hb@icon@meal}{\textcolor{HBBreak}{\faIcon{utensils}}}
+\newcommand{\hb@icon@notice}{\textcolor{HBNotice}{\faIcon{circle-exclamation}}}
+\newcommand{\hb@icon@info}{\textcolor{HBMain}{\faIcon{circle-info}}}
+% \HandbookIcon{名称}：显示带功能色的小图标。
+\newcommand{\HandbookIcon}[1]{%
+  \ifcsdef{hb@icon@#1}{\csuse{hb@icon@#1}}{%
+    \PackageError{handbookformyself}{Unknown icon '#1'}{See the icon names in README.md.}}}
+
+
+
+
+
+
+
+
+
+
+% 4. talk 变量与登记：只保存讲者、单位、题目和摘要。
+% Report data: one declaration supplies both the programme and the abstract.
+% pgfkeys is already loaded by TikZ; etoolbox supplies the empty-field checks.
+\newcounter{hb@talk}
+\pgfkeys{/hb/talk/.is family, /hb/talk,
+  speaker/.store in=\hb@speaker,
+  affiliation/.store in=\hb@affiliation,
+  title/.store in=\hb@title}
+
+% Reset optional fields each time, then read the supplied keys without expansion.
+\newcommand{\hb@setfields}[1]{%
+  \pgfkeys{/hb/talk/.cd,speaker={},affiliation={},title={},#1}}
+
+% \DeclareTalk{ID}{speaker=..., affiliation=..., title=...}{abstract}
+\NewDocumentCommand{\DeclareTalk}{m m +m}{%
+  \ifcsname hb@talk@#1\endcsname
+    \PackageError{handbookformyself}{Talk ID '#1' is already declared}
+      {Give each talk a different ID.}%
+  \else
+    \begingroup
+      \hb@setfields{#2}%
+      \expandafter\ifblank\expandafter{\hb@speaker}{%
+        \PackageError{handbookformyself}{Talk '#1' needs a speaker}
+          {Add speaker={...} to its declaration.}}{}%
+      \expandafter\ifblank\expandafter{\hb@title}{%
+        \PackageError{handbookformyself}{Talk '#1' needs a title}
+          {Add title={...} to its declaration.}}{}%
+    \endgroup
+    \stepcounter{hb@talk}%
+    % Freeze the number now; keep field values and abstract text unexpanded.
+    \expandafter\xdef\csname hb@number@#1\endcsname{\arabic{hb@talk}}%
+    \expandafter\long\expandafter\gdef\csname hb@talk@#1\endcsname{%
+      \hb@setfields{#2}}%
+    \expandafter\long\expandafter\gdef\csname hb@abstract@#1\endcsname{#3}%
+  \fi}
+
+% Load the three named fields for a rendering command. The caller opens a group
+% so that these working values cannot affect the following report.
+\newcommand{\hb@loadtalk}[1]{%
+  \hb@setfields{}%
+  \ifcsname hb@talk@#1\endcsname
+    \csname hb@talk@#1\endcsname
+  \else
+    \PackageError{handbookformyself}{Unknown talk ID '#1'}
+      {Declare this talk before using its ID.}%
+  \fi}
+
+% Numbers follow declaration order and display as 01, 02, ... .
+\newcommand{\hb@talknumber}[1]{%
+  \ifnum\csname hb@number@#1\endcsname<10 0\fi\csname hb@number@#1\endcsname}
+
+
+
+
+
+
+
+
+
+
+% 5. 页面布局：页边距、段落、列表、页眉和页脚。
+% 默认电子版；内容文件可用 \printmodetrue 开启封面背面的空白页。
+\newif\ifprintmode
+\printmodefalse
+\geometry{a4paper,left=22mm,right=22mm,top=23mm,bottom=23mm,
+  headheight=14pt,headsep=7mm,footskip=12mm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\setlength{\emergencystretch}{2em}
+\linespread{1.1}
+\raggedbottom
+\setlist{nosep}
+\setlist[itemize,enumerate]{leftmargin=*}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+% 双面排版：LE、RO 是外侧；LO、RE 是内侧。
+\fancyhead[LE,RO]{\fontsize{8}{10}\selectfont\color{HBMain}\nouppercase{\rightmark}}
+\fancyfoot[LE,RO]{\fontsize{8}{10}\selectfont\color{HBMuted}\thepage\,/\,\pageref*{LastPage}}
+% \RunningTitle{短会议名}：设置内侧页眉，页脚只保留外侧页码。
+\newcommand{\RunningTitle}[1]{%
+  \fancyhead[LO,RE]{\fontsize{8}{10}\selectfont\color{HBMuted}#1}}
+
+
+
+
+
+
+
+
+
+
+% 6. 大、小分段命令：标题由 main.tex 填写，不预设内容类别。
+% \HandbookSection[颜色]{自定义标题}[副标题]：无编号，不强制分页，标题必须填写。
+\NewDocumentCommand{\HandbookSection}{O{HBMain} m O{}}{%
+  \par\Needspace{8\baselineskip}\markright{#2}%
+  \phantomsection\addcontentsline{toc}{section}{#2}%
+  \begingroup\setlength{\parskip}{0pt}\raggedright
+    {\bfseries\fontsize{25}{29}\selectfont\color{#1}#2\par}
+    \vspace{2mm}{\color{#1}\rule{25mm}{3pt}\par}
+    \ifstrempty{#3}{}{\vspace{3mm}{\small\color{HBMuted}#3\par}}%
+  \endgroup\par\vspace{7mm}}
+
+% \HandbookSubsection[图标命令]{小分段标题}[说明]：图标与说明均可省略。
+\NewDocumentCommand{\HandbookSubsection}{O{} m O{}}{%
+  \par\addvspace{5mm}\Needspace{6\baselineskip}%
+  {\fontsize{16}{19.2}\selectfont\bfseries\color{HBMain}\ifstrempty{#1}{}{\mbox{#1}\enspace}#2\par}\nobreak
+  \ifstrempty{#3}{}{%
+    {\small\color{HBMuted}#3\par}\nobreak
+    {\color{HBMain!35}\rule{\linewidth}{0.4pt}\par}\nobreak}}
+
+
+
+
+
+
+
+
+
+
+% 7. 各类 box 与内容排版命令。
+% 7.1 通用白底 box：均可跨页，方括号参数是显示标题。
+\tcbset{handbook/.style={enhanced jigsaw,breakable,blanker,
+  boxsep=0pt,left=0pt,right=0pt,top=0pt,bottom=0pt,
+  before skip=8pt,after skip=8pt,colback=white,colbacktitle=white,
+  fonttitle=\bfseries,attach title to upper={\par\smallskip}}}
+\newtcolorbox{sessionbox}[1][Session]{handbook,coltitle=HBMain,
+  title={\HandbookIcon{session}\enspace#1}}
+\newtcolorbox{talkbox}[1][Talk]{handbook,coltitle=HBTalk,
+  title={\HandbookIcon{talk}\enspace#1}}
+\newtcolorbox{breakbox}[1][Break]{handbook,coltitle=HBBreak,
+  title={\HandbookIcon{break}\enspace#1}}
+\newtcolorbox{noticebox}[1][Notice]{handbook,left=8pt,coltitle=HBNotice,
+  borderline west={1.5pt}{0pt}{HBNotice},title={\HandbookIcon{notice}\enspace#1}}
+\newtcolorbox{infobox}[1][Information]{handbook,left=8pt,coltitle=HBMain,
+  borderline west={1.5pt}{0pt}{HBMain},title={\HandbookIcon{info}\enspace#1}}
+
+% 仅当摘要页存在时才链接，单独编译日程也不会有失效链接。
+\newcommand{\hb@talklink}[2]{%
+  \ifcsname r@hb-talk-#1\endcsname\hyperlink{hb-talk-#1}{#2}\else#2\fi}
+
+% 7.2 日程条目：ScheduleItem 与 ScheduleBreak。
+% \ScheduleItem{时间}{报告ID}：一条不可拆开的日程行。
+% 时间、讲者、题目分别占 17%、23%、55%，其余空间作为栏间距。
+\newcommand{\ScheduleItem}[2]{%
+  \begingroup\hb@loadtalk{#2}%
+  \par\noindent\begin{minipage}{\linewidth}
+    \large\setlength{\parskip}{0pt}\raggedright\vspace{1.5mm}
+    \begin{minipage}[t]{0.17\linewidth}\vspace{0pt}
+      \bfseries\color{HBTime}#1
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.23\linewidth}\vspace{0pt}\raggedright
+      {\bfseries\hb@talklink{#2}{\hb@speaker}\par}
+      \ifdefempty{\hb@affiliation}{}{{\normalsize\color{HBMuted}\hb@affiliation\par}}%
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.55\linewidth}\vspace{0pt}\raggedright
+      \HandbookIcon{talk}\enspace\textcolor{HBTalk}{\hb@talknumber{#2}}\quad
+      \hb@talklink{#2}{\hb@title}\par
+    \end{minipage}\vspace{4.5mm}
+  \end{minipage}\par\endgroup}
+
+% 浅色虚线填充剩余宽度，每段长 2mm、间隔 1mm。
+\newcommand{\hb@dashfill}{%
+  {\color{HBBreak!35}\leaders\hbox{\rule[0.5ex]{2mm}{0.35pt}\hspace{1mm}}\hfill}}
+\newsavebox{\hb@breaklabel}
+% \ScheduleBreak[图标]{时间}{说明}：整行使用休息色，说明相对整行居中。
+% 时间后直接接虚线，左侧共占 20%；说明在中间 60% 内居中，右侧补齐 20% 虚线。
+\NewDocumentCommand{\ScheduleBreak}{O{interval} m m}{%
+  \par\noindent\begin{minipage}{\linewidth}\setlength{\parskip}{0pt}\raggedright
+    \small\color{HBBreak}
+    \sbox{\hb@breaklabel}{\HandbookIcon{#1}\enspace#3}%
+    % 长说明限制宽度并自然换行，给两侧虚线保留空间。
+    \ifdim\wd\hb@breaklabel>0.5\linewidth
+      \sbox{\hb@breaklabel}{\begin{minipage}[c]{0.5\linewidth}\centering
+        \HandbookIcon{#1}\enspace#3\par
+      \end{minipage}}%
+    \fi
+    \noindent\hbox to 0.2\linewidth{#2\thinspace\hb@dashfill}%
+    \hbox to 0.6\linewidth{\hb@dashfill\enspace\usebox{\hb@breaklabel}\enspace\hb@dashfill}%
+    \hbox to 0.2\linewidth{\hb@dashfill}\par\vspace{2mm}
+  \end{minipage}\par}
+
+% 7.3 \TalkAbstract{报告ID}：标题与开头保持在一起，摘要正文可自然跨页。
+% 11pt 文档中：正文与讲者 12pt，单位 11pt，标题 15pt；局部使用 1.2 倍行距。
+\newsavebox{\hb@abstractheading}
+\newcommand{\TalkAbstract}[1]{%
+  \par\addvspace{5mm}\begingroup\linespread{1.2}\large
+  \hb@loadtalk{#1}\setlength{\parskip}{0pt}%
+  \sbox{\hb@abstractheading}{\begin{minipage}{\linewidth}\raggedright
+    \setlength{\parskip}{0pt}%
+    {\fontsize{15}{18}\selectfont\bfseries\HandbookIcon{talk}\enspace
+      \textcolor{HBTalk}{\hb@talknumber{#1}}\quad\hb@title\par}
+    \vspace{1.5mm}{\HandbookIcon{speaker}\enspace{\bfseries\itshape\hb@speaker}%
+      \ifdefempty{\hb@affiliation}{}{\quad{\normalsize\color{HBMuted}\hb@affiliation}}\par}
+    \vspace{2mm}
+  \end{minipage}}%
+  \Needspace{\dimexpr\ht\hb@abstractheading+\dp\hb@abstractheading+\baselineskip\relax}%
+  \hypertarget{hb-talk-#1}{}\label{hb-talk-#1}%
+  \noindent\usebox{\hb@abstractheading}\par\nobreak
+  % 正文首行缩进，避免多行段落的首行或末行单独跨页。
+  \setlength{\parindent}{2em}\setlength{\parskip}{0.5em}%
+  \clubpenalty=10000\widowpenalty=10000\relax
+  \csuse{hb@abstract@#1}\par
+  \endgroup}
+\endinput
